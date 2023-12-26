@@ -76,7 +76,15 @@ export class DataBindingControl extends React.Component<
 
     let schema;
     try {
-      schema = await manager.getAvailableContextFields(node);
+      let dataSource = manager.store.ctx.dataSource;
+      if (dataSource && Array.isArray(dataSource)) {
+        schema = [
+          {
+            type: 'ae-SimpleDataBindingPanel2',
+            fields: dataSource
+          }
+        ];
+      }
     } catch (e) {
       this.setState({
         loading: false,
@@ -275,3 +283,96 @@ export class SimpleDataBindingControl extends React.Component<
   type: 'ae-SimpleDataBindingPanel'
 })
 export class SimpleDataBindingControlRenderer extends SimpleDataBindingControl {}
+
+export class SimpleDataBindingControl2 extends React.Component<
+  SimpleDataBindingProps,
+  SimpleDataBindingState
+> {
+  constructor(props: SimpleDataBindingProps) {
+    super(props);
+    this.handleSearchDebounced = debounce(this.handleSearch, 250, {
+      trailing: true,
+      leading: false
+    });
+    this.state = {
+      filteredFields: props.fields
+    };
+  }
+
+  handleSearchDebounced;
+
+  @autobind
+  async handleSearch(keywords: string) {
+    this.setState({
+      filteredFields: matchSorter(this.props.fields, keywords, {
+        keys: ['label', 'value', 'children'],
+        threshold: matchSorter.rankings.CONTAINS
+      })
+    });
+  }
+
+  @autobind
+  handleSelect() {}
+
+  render() {
+    const {className, value, onSelect, isSelected} = this.props;
+
+    const {filteredFields} = this.state;
+    return (
+      <div className={cx('ae-DataBindingList', className)}>
+        <div className={cx('ae-DataBindingList-searchBox')}>
+          <SearchBox
+            mini={false}
+            placeholder={'输入名称搜索'}
+            onSearch={this.handleSearchDebounced}
+          />
+        </div>
+        <div className={cx('ae-DataBindingList-body')}>
+          {filteredFields.map((item, index) => (
+            <div key={item.value}>
+              {Array.isArray(item.children) && item.children.length > 0 ? (
+                item.children.map((childItem: DSField) => {
+                  const checked = isSelected
+                    ? isSelected(childItem)
+                    : childItem.value === value;
+                  return (
+                    <div
+                      className={cx('ae-DataBindingList-item', {
+                        'is-active': checked
+                      })}
+                      style={{paddingLeft: '40px'}}
+                      onClick={() => onSelect(childItem)}
+                      key={childItem.value}
+                    >
+                      - {childItem.label}
+                    </div>
+                  );
+                })
+              ) : (
+                <div
+                  className={cx('ae-DataBindingList-item', {
+                    'is-active': isSelected
+                      ? isSelected(item)
+                      : item.value === value
+                  })}
+                  onClick={() => {
+                    console.log(item);
+                    onSelect(item);
+                  }}
+                  key={item.value}
+                >
+                  {item.label}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+}
+
+@Renderer({
+  type: 'ae-SimpleDataBindingPanel2'
+})
+export class SimpleDataBindingControlRenderer2 extends SimpleDataBindingControl2 {}
