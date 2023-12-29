@@ -330,7 +330,21 @@ export class SimpleDataBindingControl2 extends React.Component<
         <div className={cx('ae-DataBindingList-body')}>
           {filteredFields.map((item, index) => (
             <div key={item.value}>
-              {Array.isArray(item.children) && item.children.length > 0 ? (
+              <div
+                className={cx('ae-DataBindingList-item', {
+                  'is-active': isSelected
+                    ? isSelected(item)
+                    : item.value === value
+                })}
+                onClick={() => {
+                  onSelect(item);
+                }}
+                key={item.value}
+              >
+                {item.label}
+              </div>
+              {Array.isArray(item.children) &&
+                item.children.length > 0 &&
                 item.children.map((childItem: DSField) => {
                   const checked = isSelected
                     ? isSelected(childItem)
@@ -347,23 +361,7 @@ export class SimpleDataBindingControl2 extends React.Component<
                       - {childItem.label}
                     </div>
                   );
-                })
-              ) : (
-                <div
-                  className={cx('ae-DataBindingList-item', {
-                    'is-active': isSelected
-                      ? isSelected(item)
-                      : item.value === value
-                  })}
-                  onClick={() => {
-                    console.log(item);
-                    onSelect(item);
-                  }}
-                  key={item.value}
-                >
-                  {item.label}
-                </div>
-              )}
+                })}
             </div>
           ))}
         </div>
