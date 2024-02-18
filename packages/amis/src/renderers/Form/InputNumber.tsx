@@ -383,14 +383,17 @@ export default class NumberControl extends React.Component<
 
   componentDidUpdate(prevProps: NumberProps) {
     const unit = this.getUnit();
-    const value = this.props.value;
+    const {value, formInited, onChange, setPrinstineValue} = this.props;
     if (
       value != null &&
       (typeof value === 'string' || typeof value === 'number') &&
       unit &&
       !String(value).endsWith(unit)
     ) {
-      this.props.setPrinstineValue(this.getValue(value));
+      const finalValue = this.getValue(value);
+      formInited === false
+        ? setPrinstineValue?.(finalValue)
+        : onChange?.(finalValue);
     }
     // 匹配 数字 + ?字符
     const reg = /^([-+]?(([1-9]\d*\.?\d*)|(0\.\d*[1-9]))[^\d\.]*)$/;
@@ -442,7 +445,8 @@ export default class NumberControl extends React.Component<
       themeCss,
       inputControlClassName,
       id,
-      env
+      env,
+      name
     } = this.props;
     const {unit} = this.state;
     const finalPrecision = this.filterNum(precision);
@@ -483,15 +487,22 @@ export default class NumberControl extends React.Component<
         )}
       >
         <NumberInput
+          name={name}
           inputControlClassName={cx(
             inputControlClassName,
-            setThemeClassName('inputControlClassName', id, themeCss || css),
-            setThemeClassName(
-              'inputControlClassName',
+            setThemeClassName({
+              ...this.props,
+              name: 'inputControlClassName',
               id,
-              themeCss || css,
-              'inner'
-            )
+              themeCss: themeCss || css
+            }),
+            setThemeClassName({
+              ...this.props,
+              name: 'inputControlClassName',
+              id,
+              themeCss: themeCss || css,
+              extra: 'inner'
+            })
           )}
           inputRef={this.inputRef}
           value={finalValue}
@@ -540,6 +551,7 @@ export default class NumberControl extends React.Component<
           )
         ) : null}
         <CustomStyle
+          {...this.props}
           config={{
             themeCss: themeCss || css,
             classNames: [
@@ -560,6 +572,7 @@ export default class NumberControl extends React.Component<
           env={env}
         />
         <CustomStyle
+          {...this.props}
           config={{
             themeCss: formatInputThemeCss(themeCss || css),
             classNames: [
