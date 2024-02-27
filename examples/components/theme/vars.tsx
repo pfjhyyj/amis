@@ -186,7 +186,7 @@ const fonts = [
     label: '基础字体',
     name: '--fontFamilyBase',
     defaultValue:
-      "-apple-system, BlinkMacSystemFont, 'SF Pro SC', 'SF Pro Text', 'Helvetica Neue', Helvetica, 'PingFang SC', 'Segoe UI', Roboto, 'Hiragino Sans GB', 'Arial', 'microsoft yahei ui', 'Microsoft YaHei',SimSun, sans-serif"
+      "'PingFang SC', -apple-system, BlinkMacSystemFont, 'SF Pro SC', 'SF Pro Text', 'Helvetica Neue', Helvetica, 'Segoe UI', Roboto, 'Hiragino Sans GB', 'Arial', 'microsoft yahei ui', 'Microsoft YaHei',SimSun, sans-serif"
   },
   {
     label: '等宽字体',
