@@ -41,7 +41,11 @@ import {
   resizeSensor,
   offset,
   getStyleNumber,
-  getPropValue
+  getPropValue,
+  isExpression,
+  getTree,
+  resolveVariableAndFilterForAsync,
+  getMatchedEventTargets
 } from 'amis-core';
 import {
   Button,
@@ -975,6 +979,12 @@ export default class Table extends React.Component<TableProps, object> {
     scoped.unRegisterComponent(this);
   }
 
+  rowPathPlusOffset(path: string, offset = 0) {
+    const list = path.split('.').map((item: any) => parseInt(item, 10));
+    list[0] += offset;
+    return list.join('.');
+  }
+
   subFormRef(form: any, x: number, y: number) {
     const {quickEditFormRef} = this.props;
 
@@ -1028,46 +1038,50 @@ export default class Table extends React.Component<TableProps, object> {
   }
 
   handleRowClick(item: IRow, index: number) {
-    const {dispatchEvent, store, data} = this.props;
+    const {dispatchEvent, offset = 0, store, data} = this.props;
     return dispatchEvent(
       'rowClick',
       createObject(data, {
-        rowItem: item, // 保留rowItem 可能有用户已经在用 兼容之前的版本
-        item,
-        index
+        rowItem: item.data, // 保留rowItem 可能有用户已经在用 兼容之前的版本
+        item: item.data,
+        index: index + offset,
+        indexPath: this.rowPathPlusOffset(item.path, offset)
       })
     );
   }
 
   handleRowDbClick(item: IRow, index: number) {
-    const {dispatchEvent, store, data} = this.props;
+    const {dispatchEvent, offset = 0, store, data} = this.props;
     return dispatchEvent(
       'rowDbClick',
       createObject(data, {
-        item,
-        index
+        item: item.data,
+        index: index + offset,
+        indexPath: this.rowPathPlusOffset(item.path, offset)
       })
     );
   }
 
   handleRowMouseEnter(item: IRow, index: number) {
-    const {dispatchEvent, store, data} = this.props;
+    const {dispatchEvent, offset = 0, store, data} = this.props;
     return dispatchEvent(
       'rowMouseEnter',
       createObject(data, {
-        item,
-        index
+        item: item.data,
+        index: index + offset,
+        indexPath: this.rowPathPlusOffset(item.path, offset)
       })
     );
   }
 
   handleRowMouseLeave(item: IRow, index: number) {
-    const {dispatchEvent, store, data} = this.props;
+    const {dispatchEvent, offset = 0, store, data} = this.props;
     return dispatchEvent(
       'rowMouseLeave',
       createObject(data, {
-        item,
-        index
+        item: item.data,
+        index: index + offset,
+        indexPath: this.rowPathPlusOffset(item.path, offset)
       })
     );
   }
@@ -1301,8 +1315,8 @@ export default class Table extends React.Component<TableProps, object> {
     if (this.resizeLine) {
       return;
     }
-    this.props.store.syncTableWidth();
     this.props.store.initTableWidth();
+    this.props.store.syncTableWidth();
     this.handleOutterScroll();
     callback && setTimeout(callback, 20);
   }
@@ -1662,6 +1676,7 @@ export default class Table extends React.Component<TableProps, object> {
     const {store} = this.props;
 
     store.updateColumns(columns);
+    store.persistSaveToggledColumns();
   }
 
   renderAutoFilterForm(): React.ReactNode {
@@ -1675,7 +1690,8 @@ export default class Table extends React.Component<TableProps, object> {
       translate: __,
       query,
       data,
-      autoGenerateFilter
+      autoGenerateFilter,
+      testIdBuilder
     } = this.props;
 
     const searchableColumns = store.searchableColumns;
@@ -1695,6 +1711,7 @@ export default class Table extends React.Component<TableProps, object> {
         onSearchableFromSubmit={onSearchableFromSubmit}
         onSearchableFromInit={onSearchableFromInit}
         popOverContainer={this.getPopOverContainer}
+        testIdBuilder={testIdBuilder?.getChild('filter')}
       />
     );
   }
@@ -2094,7 +2111,8 @@ export default class Table extends React.Component<TableProps, object> {
       classnames: cx,
       canAccessSuperData,
       itemBadge,
-      translate
+      translate,
+      testIdBuilder
     } = this.props;
 
     return (
@@ -2118,6 +2136,9 @@ export default class Table extends React.Component<TableProps, object> {
         quickEditFormRef={this.subFormRef}
         onImageEnlarge={this.handleImageEnlarge}
         translate={translate}
+        testIdBuilder={testIdBuilder?.getChild(
+          `cell-${props.rowPath}-${column.index}`
+        )}
       />
     );
   }
@@ -2683,7 +2704,9 @@ export default class Table extends React.Component<TableProps, object> {
       itemActions,
       dispatchEvent,
       onEvent,
-      loadingConfig
+      loadingConfig,
+      testIdBuilder,
+      data
     } = this.props;
 
     // 理论上来说 store.rows 应该也行啊
@@ -2692,13 +2715,8 @@ export default class Table extends React.Component<TableProps, object> {
 
     return (
       <>
-        {renderItemActions({
-          store,
-          classnames: cx,
-          render,
-          itemActions
-        })}
         <TableContent
+          testIdBuilder={testIdBuilder}
           tableClassName={cx(
             {
               'Table-table--checkOnItemClick': checkOnItemClick,
@@ -2751,45 +2769,18 @@ export default class Table extends React.Component<TableProps, object> {
           dispatchEvent={dispatchEvent}
           onEvent={onEvent}
           loading={store.loading} // store 的同步较慢，所以统一用 store 来下发，否则会出现 props 和 store 变化触发子节点两次 re-rerender
-        />
+        >
+          {renderItemActions({
+            store,
+            classnames: cx,
+            render,
+            itemActions
+          })}
+        </TableContent>
 
         <Spinner loadingConfig={loadingConfig} overlay show={store.loading} />
       </>
     );
-  }
-
-  doAction(action: ActionObject, args: any, throwErrors: boolean): any {
-    const {store, valueField, data} = this.props;
-
-    const actionType = action?.actionType as string;
-
-    switch (actionType) {
-      case 'selectAll':
-        store.clear();
-        store.toggleAll();
-        break;
-      case 'clearAll':
-        store.clear();
-        break;
-      case 'select':
-        const dataSource = store.getData(data);
-        const selected: Array<any> = [];
-        dataSource.items.forEach((item: any, rowIndex: number) => {
-          const flag = evalExpression(args?.selected, {record: item, rowIndex});
-          if (flag) {
-            selected.push(item);
-          }
-        });
-        store.updateSelected(selected, valueField);
-        break;
-      case 'initDrag':
-        store.stopDragging();
-        store.toggleDragging();
-        break;
-      default:
-        this.handleAction(undefined, action, data);
-        break;
-    }
   }
 
   render() {
@@ -2802,7 +2793,8 @@ export default class Table extends React.Component<TableProps, object> {
       affixHeader,
       autoFillHeight,
       autoGenerateFilter,
-      mobileUI
+      mobileUI,
+      testIdBuilder
     } = this.props;
 
     this.renderedToolbars = []; // 用来记录哪些 toolbar 已经渲染了，已经渲染了就不重复渲染了。
@@ -2821,6 +2813,7 @@ export default class Table extends React.Component<TableProps, object> {
           'Table--autoFillHeight': autoFillHeight
         })}
         style={store.buildStyles(style)}
+        {...testIdBuilder?.getTestId()}
       >
         {autoGenerateFilter ? this.renderAutoFilterForm() : null}
         {this.renderAffixHeader(tableClassName)}
@@ -2865,7 +2858,49 @@ export class TableRenderer extends Table {
     }
   }
 
-  reload(subPath?: string, query?: any, ctx?: any) {
+  /**
+   * 通过 index 或者 condition 获取需要处理的目标
+   *
+   * - index 支持数字
+   * - index 支持逗号分隔的数字列表
+   * - index 支持路径比如 0.1.2,0.1.3
+   * - index 支持表达式，比如 0.1.2,${index}
+   *
+   * - condition 上下文为当前行的数据
+   *
+   * @param ctx
+   * @param index
+   * @param condition
+   * @returns
+   */
+  async getEventTargets(
+    ctx: any,
+    index?: string | number,
+    condition?: string,
+    oldCondition?: string
+  ) {
+    const {store} = this.props;
+    return getMatchedEventTargets<IRow>(
+      store.rows,
+      ctx || this.props.data,
+      index,
+      condition,
+      oldCondition
+    );
+  }
+
+  async reload(subPath?: string, query?: any, ctx?: any, args?: any) {
+    if (args?.index || args?.condition) {
+      // 局部刷新
+      const targets = await this.getEventTargets(
+        ctx || this.props.data,
+        args.index,
+        args?.condition
+      );
+      await Promise.all(targets.map(target => this.loadDeferredRow(target)));
+      return;
+    }
+
     const scoped = this.context as IScopedContext;
     const parents = scoped?.parent?.getComponents();
 
@@ -2889,32 +2924,15 @@ export class TableRenderer extends Table {
   ) {
     const {store} = this.props;
 
-    if (index !== undefined) {
-      let items = [...store.data.rows];
-      const indexs = String(index).split(',');
-      indexs.forEach(i => {
-        const intIndex = Number(i);
-        items.splice(intIndex, 1, values);
+    if (index !== undefined || condition !== undefined) {
+      const targets = await this.getEventTargets(
+        this.props.data,
+        index,
+        condition
+      );
+      targets.forEach(target => {
+        target.updateData(values);
       });
-      // 更新指定行记录，只需要提供行记录即可
-      return store.updateData({rows: items}, undefined, replace);
-    } else if (condition !== undefined) {
-      let items = [...store.data.rows];
-      const len = items.length;
-      for (let i = 0; i < len; i++) {
-        const item = items[i];
-        const isUpdate = await evalExpressionWithConditionBuilder(
-          condition,
-          item
-        );
-
-        if (isUpdate) {
-          items.splice(i, 1, values);
-        }
-      }
-
-      // 更新指定行记录，只需要提供行记录即可
-      return store.updateData({rows: items}, undefined, replace);
     } else {
       const data = {
         ...values,
@@ -2927,6 +2945,68 @@ export class TableRenderer extends Table {
   getData() {
     const {store, data} = this.props;
     return store.getData(data);
+  }
+
+  async doAction(
+    action: ActionObject,
+    ctx: any,
+    throwErrors: boolean,
+    args: any
+  ) {
+    const {store, valueField, data} = this.props;
+
+    const actionType = action?.actionType as string;
+
+    switch (actionType) {
+      case 'selectAll':
+        store.clear();
+        store.toggleAll();
+        break;
+      case 'clearAll':
+        store.clear();
+        break;
+      case 'select':
+        const rows = await this.getEventTargets(
+          ctx,
+          args.index,
+          args.condition,
+          args.selected
+        );
+        store.updateSelected(
+          rows.map(item => item.data),
+          valueField
+        );
+        break;
+      case 'initDrag':
+        store.stopDragging();
+        store.toggleDragging();
+        break;
+      case 'submitQuickEdit':
+        this.handleSave();
+        break;
+      case 'toggleExpanded':
+        const targets = await this.getEventTargets(
+          ctx,
+          args.index,
+          args.condition
+        );
+        targets.forEach(target => {
+          store.toggleExpanded(target);
+        });
+        break;
+      case 'setExpanded':
+        const targets2 = await this.getEventTargets(
+          ctx,
+          args.index,
+          args.condition
+        );
+        targets2.forEach(target => {
+          store.setExpanded(target, !!args.value);
+        });
+        break;
+      default:
+        return this.handleAction(undefined, action, data);
+    }
   }
 }
 

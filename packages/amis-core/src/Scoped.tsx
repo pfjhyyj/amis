@@ -68,7 +68,7 @@ export function splitTarget(target: string): Array<string> {
       let parts: Array<string> = [];
 
       pos.reduceRight((arr: Array<string>, index) => {
-        arr.unshift(target.slice(index + 1));
+        arr.unshift(target.slice(index + 1)?.trim());
         target = target.slice(0, index);
         return arr;
       }, parts);
@@ -85,7 +85,8 @@ export interface ScopedComponentType extends React.Component<RendererProps> {
   doAction?: (
     action: ActionObject,
     data: RendererData,
-    throwErrors?: boolean
+    throwErrors?: boolean,
+    args?: any
   ) => void;
   receive?: (values: RendererData, subPath?: string, replace?: boolean) => void;
   reload?: (

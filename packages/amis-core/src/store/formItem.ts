@@ -28,7 +28,8 @@ import {
   eachTree,
   mapTree,
   setVariable,
-  cloneObject
+  cloneObject,
+  promisify
 } from '../utils/helper';
 import {flattenTree} from '../utils/helper';
 import find from 'lodash/find';
@@ -91,6 +92,7 @@ export const FormItemStore = StoreNode.named('FormItemStore')
     itemId: '', // 因为 name 可能会重名，所以加个 id 进来，如果有需要用来定位具体某一个
     unsetValueOnInvisible: false,
     itemsRef: types.optional(types.array(types.string), []),
+    inited: false,
     validated: false,
     validating: false,
     multiple: false,
@@ -315,8 +317,12 @@ export const FormItemStore = StoreNode.named('FormItemStore')
 
   .actions(self => {
     const form = self.form as IFormStore;
-    const dialogCallbacks = new SimpleMap<(result?: any) => void>();
+    const dialogCallbacks = new SimpleMap<
+      (confirmed?: any, result?: any) => void
+    >();
     let loadAutoUpdateCancel: Function | null = null;
+
+    const initHooks: Array<(store: any) => any> = [];
 
     function config({
       name,
@@ -1437,7 +1443,11 @@ export const FormItemStore = StoreNode.named('FormItemStore')
       clearError();
     }
 
-    function openDialog(schema: any, ctx: any, callback?: (ret?: any) => void) {
+    function openDialog(
+      schema: any,
+      ctx: any,
+      callback?: (confirmed?: any, value?: any) => void
+    ) {
       if (schema.data) {
         self.dialogData = dataMapping(schema.data, ctx);
       } else {
@@ -1449,13 +1459,13 @@ export const FormItemStore = StoreNode.named('FormItemStore')
       callback && dialogCallbacks.set(self.dialogData, callback);
     }
 
-    function closeDialog(result?: any) {
+    function closeDialog(confirmed?: any, result?: any) {
       const callback = dialogCallbacks.get(self.dialogData);
       self.dialogOpen = false;
 
       if (callback) {
         dialogCallbacks.delete(self.dialogData);
-        setTimeout(() => callback(result), 200);
+        setTimeout(() => callback(confirmed, result), 200);
       }
     }
 
@@ -1495,6 +1505,21 @@ export const FormItemStore = StoreNode.named('FormItemStore')
       self.isControlled = !!value;
     }
 
+    const init: () => Promise<void> = flow(function* init() {
+      const hooks = initHooks.sort(
+        (a: any, b: any) => (a.__weight || 0) - (b.__weight || 0)
+      );
+      try {
+        for (let hook of hooks) {
+          yield hook(self);
+        }
+      } finally {
+        if (isAlive(self)) {
+          self.inited = true;
+        }
+      }
+    });
+
     return {
       focus,
       blur,
@@ -1523,7 +1548,24 @@ export const FormItemStore = StoreNode.named('FormItemStore')
       addSubFormItem,
       removeSubFormItem,
       loadAutoUpdateData,
-      setIsControlled
+      setIsControlled,
+
+      init,
+
+      addInitHook(fn: (store: any) => any, weight = 0) {
+        fn = promisify(fn);
+        initHooks.push(fn);
+        (fn as any).__weight = weight;
+        return () => {
+          const idx = initHooks.indexOf(fn);
+          ~idx && initHooks.splice(idx, 1);
+        };
+      },
+
+      beforeDestroy: () => {
+        // 销毁
+        initHooks.splice(0, initHooks.length);
+      }
     };
   });
 

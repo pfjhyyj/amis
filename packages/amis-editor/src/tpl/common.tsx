@@ -10,7 +10,7 @@ import type {SchemaObject} from 'amis';
 import flatten from 'lodash/flatten';
 import {InputComponentName} from '../component/InputComponentName';
 import {FormulaDateType} from '../renderer/FormulaControl';
-import {VariableItem} from 'amis-ui/lib/components/formula/Editor';
+import type {VariableItem} from 'amis-ui/src/components/formula/CodeEditor';
 import reduce from 'lodash/reduce';
 import map from 'lodash/map';
 import omit from 'lodash/omit';
@@ -1753,3 +1753,54 @@ setSchemaTpl('deferField', {
   type: 'input-text',
   placeholder: '自定义开启懒加载的字段'
 });
+
+setSchemaTpl(
+  'signBtn',
+  (options: {label: string; name: string; icon: string}) => {
+    return {
+      type: 'flex',
+      justify: 'space-between',
+      alignItems: 'center',
+      items: [
+        {
+          style: {
+            color: '#5c5f66'
+          },
+          type: 'tpl',
+          tpl: options.label
+        },
+        {
+          type: 'action',
+          label: '设置',
+          level: 'link',
+          actionType: 'dialog',
+          dialog: {
+            title: '设置',
+            body: {
+              type: 'form',
+              body: [
+                {
+                  name: options.name,
+                  label: '按钮文案',
+                  type: 'input-text'
+                },
+                getSchemaTpl('icon', {
+                  name: options.icon,
+                  label: '图标'
+                })
+              ]
+            },
+            actions: [
+              {
+                type: 'submit',
+                label: '确认',
+                mergeData: true,
+                level: 'primary'
+              }
+            ]
+          }
+        }
+      ]
+    };
+  }
+);

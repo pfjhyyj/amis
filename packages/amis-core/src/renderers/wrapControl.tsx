@@ -63,7 +63,7 @@ export interface ControlOutterProps extends RendererProps {
   submitOnChange?: boolean;
   validate?: (value: any, values: any, name: string) => any;
   formItem?: IFormItemStore;
-  addHook?: (fn: () => any, type?: 'validate' | 'init' | 'flush') => void;
+  addHook?: (fn: () => any, type?: 'validate' | 'init' | 'flush') => () => void;
   removeHook?: (fn: () => any, type?: 'validate' | 'init' | 'flush') => void;
   $schema: {
     pipeIn?: (value: any, data: any) => any;
@@ -78,6 +78,7 @@ export interface ControlOutterProps extends RendererProps {
     changePristine?: boolean
   ) => void;
   formItemDispatchEvent: (type: string, data: any) => void;
+  formItemRef?: (control: any) => void;
 }
 
 export interface ControlProps {
@@ -306,6 +307,8 @@ export function wrapControl<
               };
               addHook?.(this.hook2);
             }
+
+            formItem?.init();
           }
 
           componentDidUpdate(prevProps: OuterProps) {
@@ -468,7 +471,7 @@ export function wrapControl<
 
           setInitialValue(value: any) {
             const model = this.model!;
-            const {formStore: form, data} = this.props;
+            const {formStore: form, data, canAccessSuperData} = this.props;
             const isExp = isExpression(value);
 
             if (isExp) {
@@ -479,10 +482,22 @@ export function wrapControl<
             } else {
               let initialValue = model.extraName
                 ? [
-                    getVariable(data, model.name, form?.canAccessSuperData),
-                    getVariable(data, model.extraName, form?.canAccessSuperData)
+                    getVariable(
+                      data,
+                      model.name,
+                      canAccessSuperData ?? form?.canAccessSuperData
+                    ),
+                    getVariable(
+                      data,
+                      model.extraName,
+                      canAccessSuperData ?? form?.canAccessSuperData
+                    )
                   ]
-                : getVariable(data, model.name, form?.canAccessSuperData);
+                : getVariable(
+                    data,
+                    model.name,
+                    canAccessSuperData ?? form?.canAccessSuperData
+                  );
 
               if (
                 model.extraName &&
@@ -527,7 +542,12 @@ export function wrapControl<
           }
 
           controlRef(control: any) {
-            const {addHook, removeHook, formStore: form} = this.props;
+            const {
+              addHook,
+              removeHook,
+              formStore: form,
+              formItemRef
+            } = this.props;
 
             // 因为 control 有可能被 n 层 hoc 包裹。
             while (control && control.getWrappedInstance) {
@@ -556,6 +576,7 @@ export function wrapControl<
               this.hook = undefined;
             }
 
+            formItemRef?.(control);
             // 注册到 Scoped 上
             const originRef = this.control;
             this.control = control;

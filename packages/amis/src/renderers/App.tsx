@@ -8,7 +8,13 @@ import {
   SpinnerExtraProps
 } from 'amis-ui';
 import {Layout} from 'amis-ui';
-import {Renderer, RendererProps, filter, replaceText} from 'amis-core';
+import {
+  Renderer,
+  RendererProps,
+  envOverwrite,
+  filter,
+  replaceText
+} from 'amis-core';
 import {
   BaseSchema,
   SchemaApi,
@@ -244,11 +250,13 @@ export default class App extends React.Component<AppProps, object> {
       store,
       env,
       showFullBreadcrumbPath = false,
-      showBreadcrumbHomePath = true
+      showBreadcrumbHomePath = true,
+      locale
     } = this.props;
 
     if (isEffectiveApi(api, store.data)) {
       const json = await store.fetchInitData(api, store.data, {});
+
       if (env.replaceText) {
         json.data = replaceText(
           json.data,
@@ -258,6 +266,8 @@ export default class App extends React.Component<AppProps, object> {
       }
 
       if (json?.data.pages) {
+        json.data = envOverwrite(json.data, locale);
+
         store.setPages(json.data.pages);
         store.updateActivePage(
           Object.assign({}, env ?? {}, {
@@ -274,6 +284,19 @@ export default class App extends React.Component<AppProps, object> {
 
     store.updateData(values, undefined, replace);
     this.reload();
+  }
+
+  /**
+   * 支持页面层定义 definitions，并且优先取页面层的 definitions
+   * @param name
+   * @returns
+   */
+  @autobind
+  resolveDefinitions(name: string) {
+    const {resolveDefinitions, store} = this.props;
+    const definitions = store.schema?.definitions;
+
+    return definitions?.[name] || resolveDefinitions(name);
   }
 
   @autobind
@@ -501,7 +524,8 @@ export default class App extends React.Component<AppProps, object> {
             <div className={cx('AppBody')}>
               {render('page', store.schema, {
                 key: `${store.activePage?.id}-${store.schemaKey}`,
-                data: store.pageData
+                data: store.pageData,
+                resolveDefinitions: this.resolveDefinitions
               })}
             </div>
           </>

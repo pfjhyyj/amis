@@ -649,13 +649,21 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
     } else if (action.type === 'reset') {
       this.form.reset();
     } else if (action.actionType === 'dialog') {
-      store.setCurrentAction(action);
-      store.openDialog(
-        data,
-        undefined,
-        action.callback,
-        delegate || (this.context as any)
-      );
+      store.setCurrentAction(action, this.props.resolveDefinitions);
+      return new Promise<any>(resolve => {
+        store.openDialog(
+          data,
+          undefined,
+          (confirmed: any, value: any) => {
+            action.callback?.(confirmed, value);
+            resolve({
+              confirmed,
+              value
+            });
+          },
+          delegate || (this.context as any)
+        );
+      });
     } else if (action.actionType === 'ajax') {
       if (!action.api) {
         return env.alert(`当 actionType 为 ajax 时，请设置 api 属性`);
@@ -743,11 +751,14 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
   openFeedback(dialog: any, ctx: any) {
     return new Promise(resolve => {
       const {store} = this.props;
-      store.setCurrentAction({
-        type: 'button',
-        actionType: 'dialog',
-        dialog: dialog
-      });
+      store.setCurrentAction(
+        {
+          type: 'button',
+          actionType: 'dialog',
+          dialog: dialog
+        },
+        this.props.resolveDefinitions
+      );
       store.openDialog(
         ctx,
         undefined,
@@ -1034,7 +1045,7 @@ export default class Wizard extends React.Component<WizardProps, WizardState> {
       store.updateData(values[0]);
     }
 
-    store.closeDialog(true);
+    store.closeDialog(true, values);
   }
 
   @autobind

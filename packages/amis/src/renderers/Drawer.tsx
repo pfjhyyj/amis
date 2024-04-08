@@ -7,7 +7,7 @@ import {
   resolveVariableAndFilter,
   setThemeClassName,
   ValidateError,
-  getTestId
+  RendererEvent
 } from 'amis-core';
 import {Renderer, RendererProps} from 'amis-core';
 import {SchemaNode, Schema, ActionObject} from 'amis-core';
@@ -40,6 +40,11 @@ import {isAlive} from 'mobx-state-tree';
  */
 export interface DrawerSchema extends BaseSchema {
   type: 'drawer';
+
+  /**
+   * 弹窗参数说明，值格式为 JSONSchema。
+   */
+  inputParams?: any;
 
   /**
    * 默认不用填写，自动会创建确认和取消按钮。
@@ -144,14 +149,19 @@ export interface DrawerSchema extends BaseSchema {
    */
   showErrorMsg?: boolean;
 
-  testid?: string;
+  /**
+   * 数据映射
+   */
+  data?: {
+    [propName: string]: any;
+  };
 }
 
 export type DrawerSchemaBase = Omit<DrawerSchema, 'type'>;
 
 export interface DrawerProps
   extends RendererProps,
-    Omit<DrawerSchema, 'className'>,
+    Omit<DrawerSchema, 'className' | 'data'>,
     SpinnerExtraProps {
   onClose: () => void;
   onConfirm: (
@@ -260,7 +270,7 @@ export default class Drawer extends React.Component<DrawerProps> {
   }
 
   buildActions(): Array<ActionSchema> {
-    const {actions, confirm, testid, translate: __} = this.props;
+    const {actions, confirm, translate: __, testIdBuilder} = this.props;
 
     if (typeof actions !== 'undefined') {
       return actions;
@@ -269,7 +279,7 @@ export default class Drawer extends React.Component<DrawerProps> {
     let ret: Array<ActionSchema> = [];
     ret.push({
       type: 'button',
-      testid: getTestId(testid && `${testid}-cancel`),
+      testIdBuilder: testIdBuilder?.getChild('cancel'),
       actionType: 'close',
       label: __('cancel')
     });
@@ -278,7 +288,7 @@ export default class Drawer extends React.Component<DrawerProps> {
       ret.push({
         type: 'button',
         actionType: 'confirm',
-        testid: getTestId(testid && `${testid}-confirm`),
+        testIdBuilder: testIdBuilder?.getChild('confirm'),
         label: __('confirm'),
         primary: true
       });
@@ -350,7 +360,7 @@ export default class Drawer extends React.Component<DrawerProps> {
       return;
     }
 
-    store.closeDrawer();
+    store.closeDrawer(true, values);
   }
 
   handleDrawerClose(...args: Array<any>) {
@@ -363,7 +373,7 @@ export default class Drawer extends React.Component<DrawerProps> {
       return;
     }
 
-    store.closeDrawer();
+    store.closeDrawer(...args);
   }
 
   handleDialogConfirm(
@@ -387,7 +397,7 @@ export default class Drawer extends React.Component<DrawerProps> {
       return;
     }
 
-    store.closeDialog(true);
+    store.closeDialog(true, values);
   }
 
   handleDialogClose(...args: Array<any>) {
@@ -410,7 +420,7 @@ export default class Drawer extends React.Component<DrawerProps> {
   handleFormInit(data: any) {
     const {store} = this.props;
 
-    store.setFormData(data);
+    store.updateData(data);
   }
 
   handleFormChange(data: any, name?: string) {
@@ -422,13 +432,13 @@ export default class Drawer extends React.Component<DrawerProps> {
       };
     }
 
-    store.setFormData(data);
+    store.updateData(data);
   }
 
   handleFormSaved(data: any, response: any) {
     const {store} = this.props;
 
-    store.setFormData({
+    store.updateData({
       ...data,
       ...response
     });
@@ -448,6 +458,7 @@ export default class Drawer extends React.Component<DrawerProps> {
     statusStore && isAlive(statusStore) && statusStore.resetAll();
     if (isAlive(store)) {
       store.reset();
+      store.clearMessage();
       store.setEntered(false);
       if (typeof lazySchema === 'function') {
         store.setSchema('');
@@ -537,7 +548,6 @@ export default class Drawer extends React.Component<DrawerProps> {
         {actions.map((action, key) =>
           render(`action/${key}`, action, {
             onAction: this.handleAction,
-            data: store.formData,
             key,
             disabled: action.disabled || store.loading
           })
@@ -549,11 +559,14 @@ export default class Drawer extends React.Component<DrawerProps> {
   openFeedback(dialog: any, ctx: any) {
     return new Promise(resolve => {
       const {store} = this.props;
-      store.setCurrentAction({
-        type: 'button',
-        actionType: 'dialog',
-        dialog: dialog
-      });
+      store.setCurrentAction(
+        {
+          type: 'button',
+          actionType: 'dialog',
+          dialog: dialog
+        },
+        this.props.resolveDefinitions
+      );
       store.openDialog(
         ctx,
         undefined,
@@ -639,47 +652,47 @@ export default class Drawer extends React.Component<DrawerProps> {
         }
         container={drawerContainer ? drawerContainer : env?.getModalContainer}
       >
-        <div
-          className={cx(
-            'Drawer-header',
-            headerClassName,
-            setThemeClassName({
-              ...this.props,
-              name: 'drawerHeaderClassName',
-              id,
-              themeCss
-            })
-          )}
-        >
-          {title ? (
-            <div
-              className={cx(
-                'Drawer-title',
-                setThemeClassName({
-                  ...this.props,
-                  name: 'drawerTitleClassName',
-                  id,
-                  themeCss
-                })
-              )}
-            >
-              {render('title', title, {
-                data: store.formData,
-                onConfirm: this.handleDrawerConfirm,
-                onClose: this.handleDrawerClose,
-                onAction: this.handleAction
-              })}
-            </div>
-          ) : null}
-          {header
-            ? render('header', header, {
-                data: store.formData,
-                onConfirm: this.handleDrawerConfirm,
-                onClose: this.handleDrawerClose,
-                onAction: this.handleAction
+        {title || header ? (
+          <div
+            className={cx(
+              'Drawer-header',
+              headerClassName,
+              setThemeClassName({
+                ...this.props,
+                name: 'drawerHeaderClassName',
+                id,
+                themeCss
               })
-            : null}
-        </div>
+            )}
+          >
+            {title ? (
+              <div
+                className={cx(
+                  'Drawer-title',
+                  setThemeClassName({
+                    ...this.props,
+                    name: 'drawerTitleClassName',
+                    id,
+                    themeCss
+                  })
+                )}
+              >
+                {render('title', title, {
+                  onConfirm: this.handleDrawerConfirm,
+                  onClose: this.handleDrawerClose,
+                  onAction: this.handleAction
+                })}
+              </div>
+            ) : null}
+            {header
+              ? render('header', header, {
+                  onConfirm: this.handleDrawerConfirm,
+                  onClose: this.handleDrawerClose,
+                  onAction: this.handleAction
+                })
+              : null}
+          </div>
+        ) : null}
 
         {!store.entered ? (
           <div
@@ -891,12 +904,13 @@ export class DrawerRenderer extends Drawer {
           store.updateMessage(reason.message, true);
           store.markBusying(false);
 
-          if (reason.constructor?.name === ValidateError.name) {
-            clearTimeout(this.clearErrorTimer);
-            this.clearErrorTimer = setTimeout(() => {
-              store.updateMessage('');
-            }, 3000);
-          }
+          // 通常都是数据错误，过 3 秒自动清理错误信息
+          // if (reason.constructor?.name === ValidateError.name) {
+          clearTimeout(this.clearErrorTimer);
+          this.clearErrorTimer = setTimeout(() => {
+            store.updateMessage('');
+          }, 3000);
+          // }
         });
 
       return true;
@@ -914,7 +928,8 @@ export class DrawerRenderer extends Drawer {
     action: ActionObject,
     data: object,
     throwErrors: boolean = false,
-    delegate?: IScopedContext
+    delegate?: IScopedContext,
+    rendererEvent?: RendererEvent<any>
   ) {
     const {onClose, onAction, store, env, dispatchEvent} = this.props;
 
@@ -923,6 +938,10 @@ export class DrawerRenderer extends Drawer {
       return onAction
         ? onAction(e, action, data, throwErrors, delegate || this.context)
         : false;
+    }
+
+    if (rendererEvent?.pendingPromise.length) {
+      await rendererEvent.allDone();
     }
 
     const scoped = this.context as IScopedContext;
@@ -935,7 +954,7 @@ export class DrawerRenderer extends Drawer {
       if (rendererEvent?.prevented) {
         return;
       }
-      store.setCurrentAction(action);
+      store.setCurrentAction(action, this.props.resolveDefinitions);
       onClose();
       if (action.close) {
         action.close === true
@@ -950,21 +969,37 @@ export class DrawerRenderer extends Drawer {
       if (rendererEvent?.prevented) {
         return;
       }
-      store.setCurrentAction(action);
+      store.setCurrentAction(action, this.props.resolveDefinitions);
       this.tryChildrenToHandle(action, data) || onClose();
     } else if (action.actionType === 'drawer') {
-      store.setCurrentAction(action);
-      store.openDrawer(data);
+      store.setCurrentAction(action, this.props.resolveDefinitions);
+      return new Promise<any>(resolve => {
+        store.openDrawer(data, undefined, (confirmed: any, value: any) => {
+          action.callback?.(confirmed, value);
+          resolve({
+            confirmed,
+            value
+          });
+        });
+      });
     } else if (action.actionType === 'dialog') {
-      store.setCurrentAction(action);
-      store.openDialog(
-        data,
-        undefined,
-        action.callback,
-        delegate || (this.context as any)
-      );
+      store.setCurrentAction(action, this.props.resolveDefinitions);
+      return new Promise<any>(resolve => {
+        store.openDialog(
+          data,
+          undefined,
+          (confirmed: any, value: any) => {
+            action.callback?.(confirmed, value);
+            resolve({
+              confirmed,
+              value
+            });
+          },
+          delegate || (this.context as any)
+        );
+      });
     } else if (action.actionType === 'reload') {
-      store.setCurrentAction(action);
+      store.setCurrentAction(action, this.props.resolveDefinitions);
       action.target && scoped.reload(action.target, data);
 
       if (action.close) {
@@ -976,7 +1011,7 @@ export class DrawerRenderer extends Drawer {
       // 如果有 from 了，说明是从子节点冒泡上来的，那就不再走让子节点处理的逻辑。
       // do nothing
     } else if (action.actionType === 'ajax') {
-      store.setCurrentAction(action);
+      store.setCurrentAction(action, this.props.resolveDefinitions);
       store
         .saveRemote(action.api as string, data, {
           successMessage: action.messages && action.messages.success,

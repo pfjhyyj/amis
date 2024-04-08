@@ -38,4 +38,10 @@
 }
 .btn-configured-tooltip {
   font-size: 12px;
+  width: 200px;
+  min-height: 40px;
+
+  .CodeMirror {
+    height: auto;
+  }
 }

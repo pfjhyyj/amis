@@ -44,7 +44,8 @@ function initChildren(
   depth: number,
   pindex: number,
   parentId: string,
-  path: string = ''
+  path: string = '',
+  getEntryId?: (entry: any, index: number) => string
 ): any {
   depth += 1;
   return children.map((item, index) => {
@@ -53,7 +54,9 @@ function initChildren(
       : {
           item
         };
-    const id = item.__id ?? guid();
+    const id = String(
+      getEntryId ? getEntryId(item, index) : item.__id ?? guid()
+    );
 
     return {
       // id: String(item && (item as any)[self.primaryField] || `${pindex}-${depth}-${key}`),
@@ -72,7 +75,14 @@ function initChildren(
       rowSpans: {},
       children:
         item && Array.isArray(item.children)
-          ? initChildren(item.children, depth, index, id, `${path}${index}.`)
+          ? initChildren(
+              item.children,
+              depth,
+              index,
+              id,
+              `${path}${index}.`,
+              getEntryId
+            )
           : []
     };
   });
@@ -252,14 +262,13 @@ export const Row = types
     },
 
     getDataWithModifiedChilden() {
-      let data = {
-        ...self.data
-      };
+      let data = self.data;
 
       if (data.children && self.children) {
-        data.children = self.children.map(item =>
-          item.getDataWithModifiedChilden()
-        );
+        data = {
+          ...data,
+          children: self.children.map(item => item.getDataWithModifiedChilden())
+        };
       }
 
       return data;
@@ -387,6 +396,13 @@ export const Row = types
       );
     },
 
+    setExpanded(expanded: boolean) {
+      (getParent(self, self.depth * 2) as ITableStore).setExpanded(
+        self as IRow,
+        expanded
+      );
+    },
+
     change(values: object, savePristine?: boolean) {
       self.data = immutableExtends(self.data, values);
       savePristine && (self.pristine = self.data);
@@ -487,6 +503,7 @@ export const TableStore = iRendererStore
   .named('TableStore')
   .props({
     columns: types.array(Column),
+    columnsKey: '',
     rows: types.array(Row),
     selectedRows: types.array(types.reference(Row)),
     expandedRows: types.array(types.string),
@@ -1105,6 +1122,7 @@ export const TableStore = iRendererStore
         (self.tableLayout = config.tableLayout);
 
       if (config.columns && Array.isArray(config.columns)) {
+        self.columnsKey = getPersistDataKey(config.columns);
         let columns: Array<SColumn> = config.columns
           .map(column => {
             if (
@@ -1123,7 +1141,7 @@ export const TableStore = iRendererStore
           .filter(column => column);
 
         // 更新列顺序，afterCreate生命周期中更新columns不会触发组件的render
-        const key = getPersistDataKey(columns);
+        const key = self.columnsKey;
         const data = localStorage.getItem(key);
         let tableMetaData = null;
 
@@ -1286,7 +1304,7 @@ export const TableStore = iRendererStore
           typeof column.pristine.width === 'number'
             ? `width: ${column.pristine.width}px;`
             : column.pristine.width
-            ? `width: ${column.pristine.width};`
+            ? `width: ${column.pristine.width};min-width: ${column.pristine.width};`
             : '' // todo 可能需要让修改过列宽的保持相应宽度，目前这样相当于重置了
         }`;
       });
@@ -1448,7 +1466,14 @@ export const TableStore = iRendererStore
           loading: false,
           children:
             item && Array.isArray(item.children)
-              ? initChildren(item.children, 1, index, id, `${index}.`)
+              ? initChildren(
+                  item.children,
+                  1,
+                  index,
+                  id,
+                  `${index}.`,
+                  getEntryId
+                )
               : []
         };
       });
@@ -1765,6 +1790,19 @@ export const TableStore = iRendererStore
       }
     }
 
+    function setExpanded(row: IRow | string, expanded: boolean) {
+      const id = typeof row === 'string' ? row : row.id;
+      const idx = self.expandedRows.indexOf(id);
+
+      if (expanded) {
+        if (!~idx) {
+          self.expandedRows.push(id);
+        }
+      } else {
+        ~idx && self.expandedRows.splice(idx, 1);
+      }
+    }
+
     function collapseAllAtDepth(depth: number) {
       let rows = self.getExpandedRows().filter(item => item.depth !== depth);
       self.expandedRows.replace(rows.map(item => item.id));
@@ -1841,7 +1879,7 @@ export const TableStore = iRendererStore
      * 前端持久化记录列排序，查询字段，显示列信息
      */
     function persistSaveToggledColumns() {
-      const key = getPersistDataKey(self.columnsData);
+      const key = self.columnsKey;
 
       localStorage.setItem(
         key,
@@ -1926,6 +1964,7 @@ export const TableStore = iRendererStore
       getToggleShiftRows,
       toggleExpandAll,
       toggleExpanded,
+      setExpanded,
       collapseAllAtDepth,
       clear,
       setOrderByInfo,
@@ -1947,7 +1986,7 @@ export const TableStore = iRendererStore
           if (!isAlive(self)) {
             return;
           }
-          const key = getPersistDataKey(self.columnsData);
+          const key = self.columnsKey;
           const data = localStorage.getItem(key);
 
           if (data) {

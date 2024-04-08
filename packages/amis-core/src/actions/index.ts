@@ -16,8 +16,11 @@ import './CopyAction';
 import './DialogAction';
 import './DrawerAction';
 import './EmailAction';
+import './EventAction';
 import './LinkAction';
 import './ToastAction';
+import './WaitAction';
 import './PageAction';
+import './PrintAction';
 
 export * from './Action';

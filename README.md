@@ -7,7 +7,7 @@
 [文档（国外）](https://baidu.github.io/amis/) |
 [可视化编辑器](https://aisuda.github.io/amis-editor-demo/) |
 [amis-admin](https://github.com/aisuda/amis-admin) |
-[爱速搭](https://aisuda.bce.baidu.com/aisuda-docs/)
+[爱速搭](https://aisuda.baidu.com/)
 
 </div>
 
@@ -49,7 +49,7 @@ npm start
 
 ### 测试
 
-> 注意：本地修改代码后，执行测试用例（`npm test --workspaces`）之前需要先执行`npm run build`完成编译，因为 jest 并不支持支持 TypeScript
+> 注意：本地修改代码后，执行测试用例（`npm test --workspaces`）之前需要先执行`npm run build`完成编译，因为 jest 并不支持 TypeScript
 
 ```bash
 # 安装依赖
@@ -112,4 +112,4 @@ npm run release
 
 ## 低代码平台
 
-amis 只能实现前端低代码，如果需要完整的低代码平台推荐使用[爱速搭](https://aisuda.bce.baidu.com/aisuda-docs/)。
+amis 只能实现前端低代码，如果需要完整的低代码平台推荐使用[爱速搭](https://aisuda.baidu.com/)。

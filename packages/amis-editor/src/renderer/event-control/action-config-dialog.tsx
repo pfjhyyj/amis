@@ -22,6 +22,7 @@ interface ActionDialogProp {
   show: boolean;
   type: string;
   data: any;
+  closeOnEsc?: boolean;
   pluginActions: PluginActions; // 组件的动作列表
   actionTree: RendererPluginAction[]; // 动作树
   commonActions?: {[propName: string]: RendererPluginAction}; // 公共动作Map
@@ -38,6 +39,11 @@ interface ActionDialogProp {
     node: SchemaNode,
     props?: PlainObject
   ) => JSX.Element;
+
+  subscribeSchemaSubmit: (
+    fn: (schema: any, value: any, id: string, diff?: any) => any
+  ) => () => void;
+  subscribeActionSubmit: (fn: (value: any) => any) => () => void;
 }
 
 export default class ActionDialog extends React.Component<ActionDialogProp> {
@@ -209,6 +215,8 @@ export default class ActionDialog extends React.Component<ActionDialogProp> {
   render() {
     const {
       data,
+      subscribeSchemaSubmit,
+      subscribeActionSubmit,
       show,
       type,
       actionTree,
@@ -216,7 +224,8 @@ export default class ActionDialog extends React.Component<ActionDialogProp> {
       getComponents,
       commonActions,
       onClose,
-      render
+      render,
+      closeOnEsc
     } = this.props;
     const commonUseActionSchema = this.getCommonUseActionSchema();
 
@@ -228,7 +237,7 @@ export default class ActionDialog extends React.Component<ActionDialogProp> {
         headerClassName: 'font-bold',
         className: 'action-config-dialog',
         bodyClassName: 'action-config-dialog-body',
-        closeOnEsc: true,
+        closeOnEsc: closeOnEsc,
         closeOnOutside: false,
         show,
         showCloseButton: true,
@@ -426,7 +435,10 @@ export default class ActionDialog extends React.Component<ActionDialogProp> {
         onClose
       },
       {
-        data // 必须这样，不然变量会被当作数据映射处理掉
+        data, // 必须这样，不然变量会被当作数据映射处理掉
+
+        subscribeActionSubmit,
+        subscribeSchemaSubmit
       }
     );
     //   : null;

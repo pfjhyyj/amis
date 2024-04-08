@@ -341,7 +341,8 @@ export const TREE_BASE_EVENTS = (schema: any) => {
       eventLabel: '值变化',
       description: '选中值变化时触发',
       dataSchema: (manager: EditorManager) => {
-        const {value, items} = resolveOptionEventDataSchame(manager);
+        const {value, items, itemSchema} =
+          resolveOptionEventDataSchame(manager);
 
         return [
           {
@@ -352,7 +353,19 @@ export const TREE_BASE_EVENTS = (schema: any) => {
                 title: '数据',
                 properties: {
                   value,
-                  items
+                  item: {
+                    type: 'object',
+                    title: '选中的项',
+                    properties: itemSchema
+                  },
+                  items,
+                  selectedItems: {
+                    type: 'array',
+                    title: '选中项集合',
+                    items: {
+                      type: 'object'
+                    }
+                  }
                 }
               }
             }

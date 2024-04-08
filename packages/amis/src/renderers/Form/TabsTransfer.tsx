@@ -261,7 +261,12 @@ export class TabsTransferRenderer extends BaseTabsTransferRenderer<TabsTransferP
   }
 
   // 动作
-  doAction(action: ActionObject, args: any) {
+  doAction(
+    action: ActionObject,
+    data: any,
+    throwErrors: boolean = false,
+    args?: any
+  ) {
     const {resetValue, onChange} = this.props;
     const activeKey = args?.activeKey as number;
     switch (action.actionType) {
@@ -308,7 +313,8 @@ export class TabsTransferRenderer extends BaseTabsTransferRenderer<TabsTransferP
       menuTpl,
       data,
       mobileUI,
-      initiallyOpen = true
+      initiallyOpen = true,
+      testIdBuilder
     } = this.props;
 
     return (
@@ -343,6 +349,7 @@ export class TabsTransferRenderer extends BaseTabsTransferRenderer<TabsTransferP
           ctx={data}
           mobileUI={mobileUI}
           initiallyOpen={initiallyOpen}
+          testIdBuilder={testIdBuilder}
         />
 
         <Spinner

@@ -12,7 +12,12 @@ import {SimpleMap} from '../utils/SimpleMap';
 import {StoreNode} from './node';
 import {IScopedContext} from '../Scoped';
 import {IRootStore} from './root';
-import {concatData, createObjectFromChain, extractObjectChain} from '../utils';
+import {
+  concatData,
+  createObjectFromChain,
+  extractObjectChain,
+  injectObjectChain
+} from '../utils';
 
 export const iRendererStore = StoreNode.named('iRendererStore')
   .props({
@@ -37,7 +42,9 @@ export const iRendererStore = StoreNode.named('iRendererStore')
     }
   }))
   .actions(self => {
-    const dialogCallbacks = new SimpleMap<(result?: any) => void>();
+    const dialogCallbacks = new SimpleMap<
+      (confirmed?: any, value?: any) => void
+    >();
     let dialogScoped: IScopedContext | null = null;
     let drawerScoped: IScopedContext | null = null;
     let top: IRootStore | null = null;
@@ -49,6 +56,10 @@ export const iRendererStore = StoreNode.named('iRendererStore')
 
       initData(data: object = {}, skipSetPristine = false) {
         self.initedAt = Date.now();
+
+        if (self.data.__tag) {
+          data = injectObjectChain(data, self.data.__tag);
+        }
 
         !skipSetPristine && (self.pristine = data);
         self.data = data;
@@ -71,7 +82,10 @@ export const iRendererStore = StoreNode.named('iRendererStore')
         const prev = self.data;
         let newData;
         if (tag) {
-          let proto = createObject((self.data as any).__super || null, tag);
+          let proto = createObject((self.data as any).__super || null, {
+            ...tag,
+            __tag: tag
+          });
           newData = createObject(proto, {
             ...(replace ? {} : self.data),
             ...data
@@ -155,7 +169,21 @@ export const iRendererStore = StoreNode.named('iRendererStore')
         self.data = data;
       },
 
-      setCurrentAction(action: object) {
+      setCurrentAction(action: any, resolveDefinitions?: (schema: any) => any) {
+        // 处理 $ref
+        resolveDefinitions &&
+          ['dialog', 'drawer'].forEach(key => {
+            if (action[key]?.$ref) {
+              action = {
+                ...action,
+                [key]: {
+                  ...resolveDefinitions(action[key].$ref),
+                  ...action[key]
+                }
+              };
+            }
+          });
+
         self.action = action;
         self.dialogData = false;
         self.drawerOpen = false;
@@ -164,7 +192,7 @@ export const iRendererStore = StoreNode.named('iRendererStore')
       openDialog(
         ctx: any,
         additonal?: object,
-        callback?: (ret: any) => void,
+        callback?: (confirmed: boolean, values: any) => void,
         scoped?: IScopedContext
       ) {
         const chain = extractObjectChain(ctx);
@@ -174,11 +202,11 @@ export const iRendererStore = StoreNode.named('iRendererStore')
         }
 
         const data = createObjectFromChain(chain);
-
-        if (self.action.dialog && self.action.dialog.data) {
+        const mappingData = self.action.data ?? self.action.dialog?.data;
+        if (mappingData) {
           self.dialogData = createObjectFromChain([
             top?.context,
-            dataMapping(self.action.dialog.data, data)
+            dataMapping(mappingData, data)
           ]);
 
           const clonedAction = {
@@ -197,7 +225,7 @@ export const iRendererStore = StoreNode.named('iRendererStore')
         dialogScoped = scoped || null;
       },
 
-      closeDialog(result?: any) {
+      closeDialog(confirmed?: any, data?: any) {
         const callback = dialogCallbacks.get(self.dialogData);
 
         self.dialogOpen = false;
@@ -205,14 +233,14 @@ export const iRendererStore = StoreNode.named('iRendererStore')
 
         if (callback) {
           dialogCallbacks.delete(self.dialogData);
-          setTimeout(() => callback(result), 200);
+          setTimeout(() => callback(confirmed, data), 200);
         }
       },
 
       openDrawer(
         ctx: any,
         additonal?: object,
-        callback?: (ret: any) => void,
+        callback?: (confirmed: boolean, ret: any) => void,
         scoped?: IScopedContext
       ) {
         const chain = extractObjectChain(ctx);
@@ -223,10 +251,11 @@ export const iRendererStore = StoreNode.named('iRendererStore')
 
         const data = createObjectFromChain(chain);
 
-        if (self.action.drawer.data) {
+        const mappingData = self.action.data ?? self.action.drawer.data;
+        if (mappingData) {
           self.drawerData = createObjectFromChain([
             top?.context,
-            dataMapping(self.action.drawer.data, data)
+            dataMapping(mappingData, data)
           ]);
 
           const clonedAction = {
@@ -249,14 +278,14 @@ export const iRendererStore = StoreNode.named('iRendererStore')
         drawerScoped = scoped || null;
       },
 
-      closeDrawer(result?: any) {
+      closeDrawer(confirmed?: any, data?: any) {
         const callback = dialogCallbacks.get(self.drawerData);
         self.drawerOpen = false;
         drawerScoped = null;
 
         if (callback) {
           dialogCallbacks.delete(self.drawerData);
-          setTimeout(() => callback(result), 200);
+          setTimeout(() => callback(confirmed, data), 200);
         }
       },
 

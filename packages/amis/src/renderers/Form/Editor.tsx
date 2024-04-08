@@ -128,7 +128,7 @@ export interface EditorProps extends FormControlProps {
 export default class EditorControl extends React.Component<EditorProps, any> {
   static defaultProps: Partial<EditorProps> = {
     language: 'javascript',
-    editorTheme: 'vs',
+    editorTheme: '',
     allowFullscreen: true,
     options: {
       automaticLayout: true,
@@ -160,7 +160,12 @@ export default class EditorControl extends React.Component<EditorProps, any> {
     this.toDispose.forEach(fn => fn());
   }
 
-  doAction(action: ListenerAction, args: any) {
+  doAction(
+    action: ListenerAction,
+    data: any,
+    throwErrors: boolean = false,
+    args?: any
+  ) {
     const actionType = action?.actionType as string;
     const {onChange, resetValue} = this.props;
 
@@ -285,6 +290,7 @@ export default class EditorControl extends React.Component<EditorProps, any> {
       disabled,
       options,
       editorTheme,
+      theme,
       size,
       data,
       allowFullscreen,
@@ -325,7 +331,7 @@ export default class EditorControl extends React.Component<EditorProps, any> {
           onFocus={this.handleFocus}
           onBlur={this.handleBlur}
           language={language}
-          editorTheme={editorTheme}
+          editorTheme={editorTheme || (theme === 'dark' ? 'vs-dark' : 'vs')}
           editorDidMount={this.handleEditorMounted}
           childProps={{
             placeholder: placeholder

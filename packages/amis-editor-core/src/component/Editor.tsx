@@ -10,7 +10,7 @@ import {PluginEventListener, RendererPluginAction} from '../plugin';
 import {reGenerateID} from '../util';
 import {SubEditor} from './SubEditor';
 import Breadcrumb from './Breadcrumb';
-import {destroy} from 'mobx-state-tree';
+import {destroy, isAlive} from 'mobx-state-tree';
 import {ScaffoldModal} from './ScaffoldModal';
 import {PopOverForm} from './PopOverForm';
 import {ContextMenuPanel} from './Panel/ContextMenuPanel';
@@ -255,7 +255,7 @@ export default class Editor extends Component<EditorProps> {
     this.toDispose.forEach(fn => fn());
     this.toDispose = [];
     this.manager.dispose();
-    destroy(this.store);
+    setTimeout(() => destroy(this.store), 4);
   }
 
   // 快捷功能键
@@ -418,8 +418,8 @@ export default class Editor extends Component<EditorProps> {
 
   // 右键菜单
   @autobind
-  handleContextMenu(e: React.MouseEvent<HTMLElement>) {
-    closeContextMenus();
+  async handleContextMenu(e: React.MouseEvent<HTMLElement>) {
+    await closeContextMenus();
     let targetId: string = '';
     let region = '';
 

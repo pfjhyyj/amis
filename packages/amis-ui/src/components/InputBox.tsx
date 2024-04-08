@@ -1,12 +1,15 @@
 import React from 'react';
-import {ThemeProps, buildTestId, themeable} from 'amis-core';
+import {TestIdBuilder, ThemeProps, themeable} from 'amis-core';
 import Input from './Input';
 import {autobind, ucFirst} from 'amis-core';
 import {Icon} from './icons';
 
 export interface InputBoxProps
   extends ThemeProps,
-    Omit<React.DOMAttributes<HTMLInputElement>, 'prefix' | 'onChange'> {
+    Omit<
+      React.InputHTMLAttributes<HTMLInputElement>,
+      'style' | 'prefix' | 'onChange' | 'translate' | 'size'
+    > {
   value?: string;
   readOnly?: boolean;
   onChange?: (value: string) => void;
@@ -18,7 +21,8 @@ export interface InputBoxProps
   prefix?: JSX.Element;
   children?: React.ReactNode | Array<React.ReactNode>;
   borderMode?: 'full' | 'half' | 'none';
-  testid?: string;
+  testIdBuilder?: TestIdBuilder;
+  inputRender?: (props: any, ref?: any) => JSX.Element;
 }
 
 export interface InputBoxState {
@@ -49,7 +53,7 @@ export class InputBox extends React.Component<InputBoxProps, InputBoxState> {
   @autobind
   handleChange(e: React.ChangeEvent<HTMLInputElement>) {
     const onChange = this.props.onChange;
-    onChange && onChange(e.currentTarget.value);
+    onChange && onChange(e.currentTarget ? e.currentTarget.value : (e as any));
   }
 
   @autobind
@@ -85,7 +89,8 @@ export class InputBox extends React.Component<InputBoxProps, InputBoxState> {
       borderMode,
       onClick,
       mobileUI,
-      testid,
+      testIdBuilder,
+      inputRender,
       ...rest
     } = this.props;
     const isFocused = this.state.isFocused;
@@ -104,25 +109,38 @@ export class InputBox extends React.Component<InputBoxProps, InputBoxState> {
       >
         {result}
 
-        <Input
-          {...rest}
-          value={value ?? ''}
-          onChange={this.handleChange}
-          placeholder={placeholder}
-          onFocus={this.handleFocus}
-          onBlur={this.handleBlur}
-          size={12}
-          disabled={disabled}
-          {...buildTestId(testid)}
-        />
-
-        {children}
+        {typeof inputRender === 'function' ? (
+          inputRender({
+            ...rest,
+            value: value ?? '',
+            onChange: this.handleChange as any,
+            placeholder,
+            onFocus: this.handleFocus,
+            onBlur: this.handleBlur,
+            disabled,
+            ...testIdBuilder?.getTestId()
+          })
+        ) : (
+          <Input
+            {...rest}
+            value={value ?? ''}
+            onChange={this.handleChange}
+            placeholder={placeholder}
+            onFocus={this.handleFocus}
+            onBlur={this.handleBlur}
+            size={12}
+            disabled={disabled}
+            {...testIdBuilder?.getTestId()}
+          />
+        )}
 
         {clearable && !disabled && value ? (
           <a onClick={this.clearValue} className={cx('InputBox-clear')}>
             <Icon icon="input-clear" className="icon" />
           </a>
         ) : null}
+
+        {children}
       </div>
     );
   }
